@@ -2,6 +2,9 @@
 //!
 //! Supports commands like /status, /markets, /pause, /resume, /buy, /sell
 
+#[cfg(test)]
+mod tests;
+
 use crate::client::PolymarketClient;
 use crate::config::Config;
 use crate::error::Result;
