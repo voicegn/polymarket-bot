@@ -383,6 +383,7 @@ impl MarketQualityScorer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Duration;
 
     fn make_metrics(
         liquidity: Decimal,

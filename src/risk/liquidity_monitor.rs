@@ -532,6 +532,7 @@ impl LiquidityMonitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Duration;
 
     fn make_order_book(market_id: &str, bids: Vec<(f64, f64)>, asks: Vec<(f64, f64)>) -> OrderBookSnapshot {
         OrderBookSnapshot {

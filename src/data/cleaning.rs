@@ -442,6 +442,7 @@ pub fn validate_required_fields<T: std::fmt::Debug>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Duration;
 
     #[test]
     fn test_cleaning_config_default() {
