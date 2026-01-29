@@ -1,10 +1,14 @@
 //! Trading strategy implementation
 
+pub mod crypto_hf;
+
 use crate::config::{RiskConfig, StrategyConfig};
 use crate::model::Prediction;
 use crate::types::{Market, Side, Signal};
 use chrono::Utc;
 use rust_decimal::Decimal;
+
+pub use crypto_hf::{CryptoHfStrategy, CryptoPriceTracker};
 
 /// Signal generator based on model predictions
 pub struct SignalGenerator {
