@@ -174,7 +174,7 @@ async fn run_bot(config: Config, dry_run: bool) -> anyhow::Result<()> {
     }
 
     // Initialize real-time engine with WebSocket feed
-    let (rt_signal_tx, mut rt_signal_rx) = tokio::sync::mpsc::channel(100);
+    let (rt_signal_tx, _rt_signal_rx) = tokio::sync::mpsc::channel(100);
     let realtime_engine = Arc::new(RealtimeEngine::new(rt_signal_tx));
     
     // Start Binance WebSocket feed in background
