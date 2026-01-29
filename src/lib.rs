@@ -30,3 +30,5 @@ mod types_tests;
 mod config_tests;
 #[cfg(test)]
 mod error_tests;
+#[cfg(test)]
+mod integration_tests;
