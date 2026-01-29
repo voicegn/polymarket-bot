@@ -33,27 +33,31 @@ impl SignalGenerator {
             return None;
         }
 
-        // Determine side
-        let (side, token_id) = if edge > Decimal::ZERO {
-            // Model thinks Yes is underpriced -> Buy Yes
-            let token_id = market
-                .outcomes
-                .iter()
-                .find(|o| o.outcome.to_lowercase() == "yes")
-                .map(|o| o.token_id.clone())?;
-            (Side::Buy, token_id)
+        // Determine side and token
+        // edge > 0: Model thinks Yes underpriced -> Buy Yes
+        // edge < 0: Model thinks Yes overpriced -> Sell Yes (not Buy No!)
+        //           Selling Yes is usually more liquid than buying No
+        let yes_token = market
+            .outcomes
+            .iter()
+            .find(|o| o.outcome.to_lowercase() == "yes")
+            .map(|o| o.token_id.clone())?;
+
+        let (side, token_id, effective_prob) = if edge > Decimal::ZERO {
+            (Side::Buy, yes_token, model_prob)
         } else {
-            // Model thinks Yes is overpriced -> Buy No (or sell Yes)
-            let token_id = market
-                .outcomes
-                .iter()
-                .find(|o| o.outcome.to_lowercase() == "no")
-                .map(|o| o.token_id.clone())?;
-            (Side::Buy, token_id)
+            // Sell Yes when overpriced
+            // For Kelly calculation, we're betting on "not Yes" at price (1 - market_prob)
+            (Side::Sell, yes_token, Decimal::ONE - model_prob)
         };
 
         // Calculate position size using Kelly criterion
-        let suggested_size = self.calculate_kelly_size(edge.abs(), prediction.confidence);
+        let market_price = if edge > Decimal::ZERO {
+            market_prob
+        } else {
+            Decimal::ONE - market_prob // Selling Yes = buying at (1 - price)
+        };
+        let suggested_size = self.calculate_kelly_size(effective_prob, market_price, prediction.confidence);
 
         Some(Signal {
             market_id: market.id.clone(),
@@ -69,19 +73,46 @@ impl SignalGenerator {
     }
 
     /// Calculate position size using fractional Kelly criterion
-    fn calculate_kelly_size(&self, edge: Decimal, confidence: Decimal) -> Decimal {
-        // Kelly formula: f* = (bp - q) / b
-        // Where b = odds, p = probability of win, q = probability of loss
-        //
-        // Simplified for binary markets:
-        // f* = edge / (1 - market_price)
-        //
-        // We use fractional Kelly for safety
+    ///
+    /// Kelly formula for binary bets: f* = (p * b - q) / b
+    /// Where:
+    ///   p = probability of winning (model's estimate)
+    ///   q = probability of losing (1 - p)
+    ///   b = odds ratio = (1 - market_price) / market_price
+    ///
+    /// Simplified: f* = p - q/b = p - (1-p) * market_price / (1 - market_price)
+    ///           = (p * (1 - market_price) - (1 - p) * market_price) / (1 - market_price)
+    ///           = (p - market_price) / (1 - market_price)
+    ///           = edge / (1 - market_price)
+    fn calculate_kelly_size(
+        &self,
+        model_prob: Decimal,
+        market_price: Decimal,
+        confidence: Decimal,
+    ) -> Decimal {
+        // Edge = model_prob - market_price
+        let edge = model_prob - market_price;
+        
+        // Potential profit if we win = 1 - market_price (we pay market_price, get 1)
+        let potential_profit = Decimal::ONE - market_price;
+        
+        // Avoid division by zero
+        if potential_profit <= Decimal::ZERO {
+            return Decimal::ZERO;
+        }
 
-        let base_kelly = edge / (Decimal::ONE - edge);
-        let fractional_kelly = base_kelly * self.config.kelly_fraction;
+        // Full Kelly: f* = edge / potential_profit
+        let full_kelly = edge / potential_profit;
+        
+        // Never bet negative (shouldn't happen if edge > 0, but safety first)
+        if full_kelly <= Decimal::ZERO {
+            return Decimal::ZERO;
+        }
 
-        // Apply confidence adjustment
+        // Fractional Kelly for safety (typically 0.25 - 0.5)
+        let fractional_kelly = full_kelly * self.config.kelly_fraction;
+
+        // Adjust by model confidence
         let adjusted = fractional_kelly * confidence;
 
         // Cap at max position size

@@ -11,6 +11,7 @@ pub struct Config {
     pub risk: RiskConfig,
     pub database: DatabaseConfig,
     pub llm: Option<LlmConfig>,
+    pub telegram: Option<TelegramConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -71,6 +72,30 @@ pub struct LlmConfig {
     pub api_key: String,
     /// Model name
     pub model: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TelegramConfig {
+    /// Bot token from @BotFather
+    pub bot_token: String,
+    /// Chat ID to send messages to (your user ID or group ID)
+    pub chat_id: String,
+    /// Send signal notifications (default: true)
+    #[serde(default = "default_true")]
+    pub notify_signals: bool,
+    /// Send trade execution notifications (default: true)
+    #[serde(default = "default_true")]
+    pub notify_trades: bool,
+    /// Send error notifications (default: true)
+    #[serde(default = "default_true")]
+    pub notify_errors: bool,
+    /// Send daily reports (default: true)
+    #[serde(default = "default_true")]
+    pub notify_daily: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Config {

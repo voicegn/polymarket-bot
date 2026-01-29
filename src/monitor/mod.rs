@@ -20,7 +20,7 @@ pub struct TradeRecord {
     pub pnl: Option<Decimal>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PerformanceStats {
     pub total_trades: usize,
     pub winning_trades: usize,

@@ -49,3 +49,15 @@ provider = "anthropic"
 api_key = "YOUR_ANTHROPIC_API_KEY"
 # Model name
 model = "claude-sonnet-4-20250514"
+
+[telegram]
+# Bot token from @BotFather - KEEP SECRET!
+bot_token = "YOUR_BOT_TOKEN"
+# Chat ID to send messages to (your Telegram user ID)
+# Get it by messaging @userinfobot
+chat_id = "YOUR_CHAT_ID"
+# Notification settings (all default to true)
+notify_signals = true   # Signal found notifications
+notify_trades = true    # Trade execution notifications  
+notify_errors = true    # Error notifications
+notify_daily = true     # Daily performance reports

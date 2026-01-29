@@ -307,6 +307,57 @@ impl ClobClient {
             asks: parse_levels(&resp["asks"]),
         })
     }
+
+    /// Get current positions
+    pub async fn get_positions(&self) -> Result<Vec<crate::types::Position>> {
+        let creds = self.credentials.read().await;
+        let creds = creds
+            .as_ref()
+            .ok_or_else(|| BotError::Auth("Not authenticated".into()))?;
+
+        let url = format!("{}/positions", self.base_url);
+        let resp: Vec<serde_json::Value> = self
+            .http
+            .get(&url)
+            .header("POLY_ADDRESS", &creds.api_passphrase)
+            .header("POLY_SIGNATURE", &creds.api_secret)
+            .header("POLY_TIMESTAMP", creds.timestamp.to_string())
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        Ok(resp
+            .into_iter()
+            .filter_map(|p| {
+                let size: Decimal = p["size"].as_str()?.parse().ok()?;
+                // Skip zero positions
+                if size == Decimal::ZERO {
+                    return None;
+                }
+
+                Some(crate::types::Position {
+                    token_id: p["asset"].as_str()?.to_string(),
+                    market_id: p["market"].as_str().unwrap_or("unknown").to_string(),
+                    side: if size > Decimal::ZERO {
+                        crate::types::Side::Buy
+                    } else {
+                        crate::types::Side::Sell
+                    },
+                    size: size.abs(),
+                    avg_entry_price: p["avgCost"].as_str()?.parse().ok()?,
+                    current_price: p["curPrice"]
+                        .as_str()
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(Decimal::ZERO),
+                    unrealized_pnl: p["unrealizedPnl"]
+                        .as_str()
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(Decimal::ZERO),
+                })
+            })
+            .collect())
+    }
 }
 
 /// Order book data

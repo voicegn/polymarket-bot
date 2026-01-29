@@ -1,7 +1,9 @@
 //! Data storage and persistence
 
 use crate::error::Result;
+use crate::monitor::PerformanceStats;
 use crate::types::Trade;
+use rust_decimal::Decimal;
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::path::Path;
 
@@ -113,6 +115,39 @@ impl Database {
         .await?;
 
         Ok(rows.into_iter().filter_map(|r| r.try_into().ok()).collect())
+    }
+
+    /// Get daily performance stats
+    pub async fn get_daily_stats(&self) -> Result<PerformanceStats> {
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        
+        let rows = sqlx::query_as::<_, TradeRow>(
+            r#"
+            SELECT id, order_id, token_id, market_id, side, price, size, fee, timestamp
+            FROM trades
+            WHERE timestamp LIKE ?
+            ORDER BY timestamp DESC
+            "#,
+        )
+        .bind(format!("{}%", today))
+        .fetch_all(&self.pool)
+        .await?;
+
+        let trades: Vec<Trade> = rows.into_iter().filter_map(|r| r.try_into().ok()).collect();
+        
+        let total_trades = trades.len();
+        // Note: PnL calculation requires position tracking - simplified here
+        let total_pnl = Decimal::ZERO; // TODO: Calculate from closed positions
+        
+        Ok(PerformanceStats {
+            total_trades,
+            winning_trades: 0,
+            losing_trades: 0,
+            win_rate: Decimal::ZERO,
+            total_pnl,
+            avg_pnl_per_trade: Decimal::ZERO,
+            sharpe_ratio: None,
+        })
     }
 }
 

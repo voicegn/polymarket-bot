@@ -2,6 +2,7 @@
 //!
 //! An automated trading system for Polymarket prediction markets.
 
+use chrono::Timelike;
 use clap::{Parser, Subcommand};
 use polymarket_bot::{
     client::PolymarketClient,
@@ -9,11 +10,15 @@ use polymarket_bot::{
     executor::Executor,
     model::{EnsembleModel, LlmModel, ProbabilityModel},
     monitor::Monitor,
+    notify::Notifier,
     storage::Database,
     strategy::SignalGenerator,
+    telegram::{TelegramBot, CommandHandler, BotCommand},
 };
 use rust_decimal::Decimal;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser)]
@@ -49,6 +54,10 @@ enum Commands {
     },
     /// Show account status
     Status,
+    /// Send status report to Telegram
+    Report,
+    /// Test Telegram notification
+    TestNotify,
 }
 
 #[tokio::main]
@@ -69,6 +78,8 @@ async fn main() -> anyhow::Result<()> {
         Commands::Markets { limit } => show_markets(config, limit).await,
         Commands::Analyze { market_id } => analyze_market(config, &market_id).await,
         Commands::Status => show_status(config).await,
+        Commands::Report => send_report(config).await,
+        Commands::TestNotify => test_notify(config).await,
     }
 }
 
@@ -79,12 +90,47 @@ async fn run_bot(config: Config, dry_run: bool) -> anyhow::Result<()> {
         tracing::warn!("Running in DRY RUN mode - no actual trades will be executed");
     }
 
+    // Initialize Telegram notifier
+    let notifier = if let Some(tg) = &config.telegram {
+        Notifier::new(tg.bot_token.clone(), tg.chat_id.clone())
+    } else {
+        tracing::warn!("Telegram not configured, notifications disabled");
+        Notifier::disabled()
+    };
+
+    // Send startup notification
+    if let Err(e) = notifier.startup(dry_run).await {
+        tracing::warn!("Failed to send startup notification: {}", e);
+    }
+
     // Initialize components
-    let client = PolymarketClient::new(config.polymarket.clone()).await?;
+    let client = Arc::new(PolymarketClient::new(config.polymarket.clone()).await?);
     client.clob.initialize().await?;
 
-    let db = Database::connect(&config.database.path).await?;
+    let db = Arc::new(Database::connect(&config.database.path).await?);
     let monitor = Monitor::new(1000);
+
+    // Initialize command handler for Telegram
+    let cmd_handler = Arc::new(CommandHandler::new(config.clone(), notifier.clone()));
+
+    // Create command channel
+    let (cmd_tx, mut cmd_rx) = mpsc::channel::<BotCommand>(100);
+
+    // Start Telegram command listener if configured
+    if let Some(tg) = &config.telegram {
+        let telegram_bot = Arc::new(TelegramBot::new(
+            tg.bot_token.clone(),
+            tg.chat_id.clone(),
+            cmd_tx,
+        ));
+        
+        let bot_clone = telegram_bot.clone();
+        tokio::spawn(async move {
+            bot_clone.start_polling().await;
+        });
+        
+        tracing::info!("Telegram command listener started");
+    }
 
     // Initialize model
     let mut model = EnsembleModel::new();
@@ -95,17 +141,59 @@ async fn run_bot(config: Config, dry_run: bool) -> anyhow::Result<()> {
 
     // Initialize strategy
     let signal_gen = SignalGenerator::new(config.strategy.clone(), config.risk.clone());
-    let executor = Executor::new(client.clob, config.risk.clone());
+    let executor = Arc::new(Executor::new(client.clob.clone(), config.risk.clone()));
+    let tg_config = config.telegram.clone();
+    let notifier = Arc::new(notifier);
 
     tracing::info!("Bot initialized. Starting main loop...");
 
+    // Spawn daily report task
+    if tg_config.as_ref().map(|c| c.notify_daily).unwrap_or(false) {
+        let notifier_clone = notifier.clone();
+        let db_clone = db.clone();
+        let client_clone = client.clone();
+        
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(24 * 60 * 60));
+            // Wait for first tick (starts immediately)
+            interval.tick().await;
+            
+            loop {
+                interval.tick().await;
+                
+                // Send daily report at midnight UTC
+                let now = chrono::Utc::now();
+                if now.hour() == 0 && now.minute() < 5 {
+                    let balance = client_clone.clob.get_balance().await.unwrap_or(Decimal::ZERO);
+                    let stats = db_clone.get_daily_stats().await.unwrap_or_default();
+                    let _ = notifier_clone.daily_report(&stats, balance).await;
+                }
+            }
+        });
+    }
+
     // Main trading loop
     loop {
+        // Process any pending Telegram commands
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            cmd_handler.handle(cmd, &client, &db).await;
+        }
+
+        // Check if trading is paused
+        if cmd_handler.is_paused().await {
+            tracing::info!("Trading paused, waiting...");
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            continue;
+        }
+
         // Get portfolio value
         let balance = match executor.clob.get_balance().await {
             Ok(b) => b,
             Err(e) => {
                 tracing::error!("Failed to get balance: {}", e);
+                if tg_config.as_ref().map(|c| c.notify_errors).unwrap_or(false) {
+                    let _ = notifier.error("Balance fetch", &e.to_string()).await;
+                }
                 tokio::time::sleep(Duration::from_secs(60)).await;
                 continue;
             }
@@ -118,6 +206,9 @@ async fn run_bot(config: Config, dry_run: bool) -> anyhow::Result<()> {
             Ok(m) => m,
             Err(e) => {
                 tracing::error!("Failed to get markets: {}", e);
+                if tg_config.as_ref().map(|c| c.notify_errors).unwrap_or(false) {
+                    let _ = notifier.error("Market fetch", &e.to_string()).await;
+                }
                 tokio::time::sleep(Duration::from_secs(60)).await;
                 continue;
             }
@@ -155,15 +246,32 @@ async fn run_bot(config: Config, dry_run: bool) -> anyhow::Result<()> {
                     signal.edge * Decimal::ONE_HUNDRED
                 );
 
+                // Send signal notification
+                if tg_config.as_ref().map(|c| c.notify_signals).unwrap_or(false) {
+                    let _ = notifier.signal_found(&signal, &market.question).await;
+                }
+
                 if !dry_run {
                     match executor.execute(&signal, balance).await {
                         Ok(Some(trade)) => {
                             tracing::info!("Trade executed: {}", trade.id);
                             db.save_trade(&trade).await?;
+
+                            // Update PnL tracking for risk management
+                            // (simplified - real PnL requires mark-to-market)
+                            let _ = cmd_handler.check_risk_limits(Decimal::ZERO).await;
+
+                            // Send trade notification
+                            if tg_config.as_ref().map(|c| c.notify_trades).unwrap_or(false) {
+                                let _ = notifier.trade_executed(&trade, &market.question).await;
+                            }
                         }
                         Ok(None) => {}
                         Err(e) => {
                             tracing::error!("Execution failed: {}", e);
+                            if tg_config.as_ref().map(|c| c.notify_errors).unwrap_or(false) {
+                                let _ = notifier.error("Trade execution", &e.to_string()).await;
+                            }
                         }
                     }
                 }
@@ -276,5 +384,39 @@ async fn show_status(config: Config) -> anyhow::Result<()> {
         }
     }
 
+    Ok(())
+}
+
+async fn send_report(config: Config) -> anyhow::Result<()> {
+    let tg_config = config.telegram.as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Telegram not configured in config.toml"))?;
+    
+    let notifier = Notifier::new(tg_config.bot_token.clone(), tg_config.chat_id.clone());
+    
+    // Get account status
+    let client = PolymarketClient::new(config.polymarket).await?;
+    client.clob.initialize().await?;
+    let balance = client.clob.get_balance().await?;
+    
+    // Get stats from database
+    let db = Database::connect(&config.database.path).await?;
+    let stats = db.get_daily_stats().await.unwrap_or_default();
+    
+    // Send report
+    notifier.daily_report(&stats, balance).await?;
+    
+    println!("✅ Report sent to Telegram");
+    Ok(())
+}
+
+async fn test_notify(config: Config) -> anyhow::Result<()> {
+    let tg_config = config.telegram.as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Telegram not configured in config.toml"))?;
+    
+    let notifier = Notifier::new(tg_config.bot_token.clone(), tg_config.chat_id.clone());
+    
+    notifier.send("🧪 <b>Test Notification</b>\n\nIf you see this, Telegram integration is working!").await?;
+    
+    println!("✅ Test notification sent!");
     Ok(())
 }
