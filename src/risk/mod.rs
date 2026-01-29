@@ -8,6 +8,7 @@
 //! - Black swan protection
 //! - Liquidity monitoring
 //! - Enhanced correlation risk analysis
+//! - Trailing stop loss with profit locking
 
 mod daily_pnl;
 mod volatility_sizer;
@@ -16,6 +17,7 @@ mod position_manager;
 mod black_swan;
 mod liquidity_monitor;
 mod correlation_risk;
+mod trailing_stop;
 
 #[cfg(test)]
 mod tests;
@@ -37,6 +39,10 @@ pub use correlation_risk::{
     CorrelationCluster, CorrelationWarning, RiskRecommendation,
     PositionInfo, NewPositionRisk
 };
+pub use trailing_stop::{
+    TrailingStopManager, TrailingStopConfig, TrailingStopState,
+    TrailingStopAction, TrailingStopSummary, TrailingMode, ExitReason
+};
 
 use crate::config::RiskConfig;
 use crate::types::{Market, Position, Signal};
@@ -53,6 +59,7 @@ pub struct RiskManager {
     pub black_swan_protector: BlackSwanProtector,
     pub liquidity_monitor: LiquidityMonitor,
     pub correlation_risk: CorrelationRiskManager,
+    pub trailing_stop: TrailingStopManager,
 }
 
 impl RiskManager {
@@ -62,6 +69,7 @@ impl RiskManager {
         let black_swan_config = BlackSwanConfig::default();
         let liquidity_config = LiquidityConfig::default();
         let correlation_risk_config = CorrelationRiskConfig::default();
+        let trailing_stop_config = TrailingStopConfig::default();
         
         Self {
             pnl_tracker: DailyPnlTracker::new(config.max_daily_loss_pct),
@@ -71,6 +79,7 @@ impl RiskManager {
             black_swan_protector: BlackSwanProtector::new(black_swan_config),
             liquidity_monitor: LiquidityMonitor::new(liquidity_config),
             correlation_risk: CorrelationRiskManager::new(correlation_risk_config),
+            trailing_stop: TrailingStopManager::new(trailing_stop_config),
             config,
         }
     }
