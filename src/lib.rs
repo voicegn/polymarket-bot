@@ -35,6 +35,7 @@ pub mod risk;
 pub mod routing;
 pub mod sentiment;
 pub mod signal_decay;
+pub mod stat_arb;
 pub mod storage;
 pub mod strategy;
 pub mod telegram;
