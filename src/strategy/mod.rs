@@ -8,6 +8,8 @@ pub mod trend_detector;
 pub mod backtest;
 pub mod market_quality;
 pub mod daily_risk;
+pub mod arbitrage;
+pub mod volatility_adaptive;
 
 #[cfg(test)]
 mod tests;
@@ -20,6 +22,8 @@ pub use compound::CompoundStrategy;
 pub use copy_trade::{CopyTrader, CopySignal, TopTrader, CopyTradeConfig};
 pub use market_quality::{MarketQualityScorer, MarketQuality, MarketMetrics, QualityAssessment, QualityScorerConfig};
 pub use daily_risk::{DailyRiskLimiter, DailyRiskConfig, RiskState, RiskCheckResult, RiskBudget};
+pub use arbitrage::{ArbitrageDetector, ArbitrageOpportunity, ArbitrageConfig, ArbitrageType, MarketData as ArbMarketData};
+pub use volatility_adaptive::{VolatilityAdaptiveExits, VolatilityTracker, VolatilityRegime, AdaptiveParams, AtrTrailingStop};
 
 use crate::config::{RiskConfig, StrategyConfig};
 use crate::model::Prediction;

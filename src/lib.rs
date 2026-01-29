@@ -27,6 +27,7 @@ pub mod strategy;
 pub mod telegram;
 pub mod testing;
 pub mod types;
+pub mod utils;
 
 #[cfg(test)]
 mod types_tests;

@@ -4,6 +4,7 @@
 //! - High volatility → smaller positions
 //! - Low volatility → larger positions (up to max)
 
+use crate::utils::sqrt_decimal;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::collections::{HashMap, VecDeque};
@@ -174,26 +175,6 @@ impl VolatilityPositionSizer {
     }
 }
 
-/// Approximate square root using Newton's method
-fn sqrt_decimal(x: Decimal) -> Decimal {
-    if x <= Decimal::ZERO {
-        return Decimal::ZERO;
-    }
-
-    let mut guess = x / dec!(2);
-    let tolerance = dec!(0.0001);
-    
-    for _ in 0..20 {
-        let new_guess = (guess + x / guess) / dec!(2);
-        if (new_guess - guess).abs() < tolerance {
-            return new_guess;
-        }
-        guess = new_guess;
-    }
-    
-    guess
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,18 +318,6 @@ mod tests {
         assert_eq!(markets.len(), 2);
         assert!(markets.contains(&"market1".to_string()));
         assert!(markets.contains(&"market2".to_string()));
-    }
-
-    #[test]
-    fn test_sqrt_decimal() {
-        let result = sqrt_decimal(dec!(4));
-        assert!((result - dec!(2)).abs() < dec!(0.001));
-        
-        let result = sqrt_decimal(dec!(9));
-        assert!((result - dec!(3)).abs() < dec!(0.001));
-        
-        let result = sqrt_decimal(dec!(0));
-        assert_eq!(result, Decimal::ZERO);
     }
 
     #[test]

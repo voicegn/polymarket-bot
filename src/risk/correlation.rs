@@ -3,6 +3,7 @@
 //! Detects correlation between markets to avoid overexposure
 //! to correlated positions.
 
+use crate::utils::sqrt_decimal;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::collections::{HashMap, VecDeque};
@@ -224,26 +225,6 @@ impl CorrelationMatrix {
     pub fn iter(&self) -> impl Iterator<Item = &MarketCorrelation> {
         self.correlations.values()
     }
-}
-
-/// Approximate square root using Newton's method
-fn sqrt_decimal(x: Decimal) -> Decimal {
-    if x <= Decimal::ZERO {
-        return Decimal::ZERO;
-    }
-
-    let mut guess = x / dec!(2);
-    let tolerance = dec!(0.0001);
-    
-    for _ in 0..20 {
-        let new_guess = (guess + x / guess) / dec!(2);
-        if (new_guess - guess).abs() < tolerance {
-            return new_guess;
-        }
-        guess = new_guess;
-    }
-    
-    guess
 }
 
 #[cfg(test)]
