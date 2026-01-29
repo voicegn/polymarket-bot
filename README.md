@@ -298,7 +298,7 @@ cargo test executor::
 cargo test --test integration
 ```
 
-**Current test coverage: 324 tests passing**
+**Current test coverage: 544 tests passing**
 
 ## 📈 Performance
 
@@ -325,9 +325,10 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 📚 Documentation
 
-- [Operations Manual](docs/MANUAL.md) - Detailed deployment and configuration guide
+- [Operations Manual](docs/OPERATIONS.md) - Deployment, monitoring, and troubleshooting
+- [Configuration Guide](docs/MANUAL.md) - Complete configuration reference
+- [Trading Strategies](docs/STRATEGY.md) - Strategy implementation guide
 - [API Reference](docs/API.md) - Public modules and functions
-- [Strategy Analysis](docs/STRATEGY_ANALYSIS.md) - Deep dive into trading strategies
 
 ---
 
