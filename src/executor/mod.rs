@@ -2,6 +2,9 @@
 
 pub mod smart_executor;
 pub mod gradual_exit;
+pub mod slippage_predictor;
+
+pub use slippage_predictor::{SlippagePredictor, SlippageConfig, SlippagePrediction, OrderBook, OrderSide};
 
 #[cfg(test)]
 mod tests;

@@ -13,6 +13,7 @@ pub mod enhanced_filter;
 pub mod arbitrage;
 pub mod volatility_adaptive;
 pub mod signal_aggregator;
+pub mod performance_monitor;
 
 #[cfg(test)]
 mod tests;
@@ -30,6 +31,7 @@ pub use enhanced_filter::{EnhancedSignalFilter, EnhancedFilterConfig, SignalCand
 pub use arbitrage::{ArbitrageDetector, ArbitrageOpportunity, ArbitrageConfig, ArbitrageType, MarketData as ArbMarketData};
 pub use volatility_adaptive::{VolatilityAdaptiveExits, VolatilityTracker, VolatilityRegime, AdaptiveParams, AtrTrailingStop};
 pub use signal_aggregator::{SignalAggregator, AggregatedDecision, SignalSource, SignalType, SignalDirection, AggregatorConfig, SignalBuilder};
+pub use performance_monitor::{PerformanceMonitor, PerformanceMetrics, CompletedTrade, MarketRegime, PerformanceAlert, AlertType, AlertSeverity, MonitorConfig, RegimeAdjustments};
 
 use crate::config::{RiskConfig, StrategyConfig};
 use crate::model::Prediction;
