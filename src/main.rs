@@ -21,6 +21,7 @@ use polymarket_bot::{
     strategy::{
         SignalGenerator,
         copy_trade::{CopyTrader, TopTrader},
+        crypto_hf::{CryptoHfStrategy, CryptoPriceTracker},
     },
     telegram::{TelegramBot, CommandHandler, BotCommand},
 };
@@ -163,6 +164,14 @@ async fn run_bot(config: Config, dry_run: bool) -> anyhow::Result<()> {
 
     // Initialize strategy
     let signal_gen = SignalGenerator::new(config.strategy.clone(), config.risk.clone());
+    let crypto_strategy = CryptoHfStrategy::default();
+    let mut crypto_tracker = CryptoPriceTracker::new();
+    
+    // Initialize crypto price history from Binance klines
+    if let Err(e) = crypto_tracker.init_history().await {
+        tracing::warn!("Failed to initialize crypto price history: {}", e);
+    }
+    
     let executor = Arc::new(Executor::new(client.clob.clone(), config.risk.clone()));
     let tg_config = config.telegram.clone();
     let notifier = Arc::new(notifier);
@@ -463,8 +472,8 @@ async fn run_bot(config: Config, dry_run: bool) -> anyhow::Result<()> {
 
         tracing::info!("Current balance: ${:.2}", balance);
 
-        // Get top markets
-        let markets = match client.gamma.get_top_markets(20).await {
+        // Get top markets + crypto markets
+        let mut markets = match client.gamma.get_top_markets(20).await {
             Ok(m) => m,
             Err(e) => {
                 tracing::error!("Failed to get markets: {}", e);
@@ -476,26 +485,57 @@ async fn run_bot(config: Config, dry_run: bool) -> anyhow::Result<()> {
             }
         };
 
+        // Also fetch crypto markets (BTC/ETH Up/Down)
+        match client.gamma.get_crypto_markets().await {
+            Ok(crypto_markets) => {
+                tracing::info!("Found {} crypto markets", crypto_markets.len());
+                markets.extend(crypto_markets);
+            }
+            Err(e) => {
+                tracing::warn!("Failed to fetch crypto markets: {}", e);
+            }
+        }
+
+        // Update crypto prices for HF strategy
+        if let Err(e) = crypto_tracker.update_prices().await {
+            tracing::debug!("Failed to update crypto prices: {}", e);
+        }
+
         tracing::info!("Scanning {} markets...", markets.len());
 
         // Analyze each market
         for market in &markets {
-            // Skip low liquidity markets
-            if market.liquidity < Decimal::new(10000, 0) {
+            // Check if this is a crypto Up/Down market
+            let is_crypto_market = CryptoHfStrategy::is_crypto_hf_market(market).is_some();
+            
+            // Skip low liquidity markets (lower threshold for crypto markets)
+            let min_liquidity = if is_crypto_market {
+                Decimal::new(1000, 0)  // $1,000 for crypto markets
+            } else {
+                Decimal::new(10000, 0) // $10,000 for regular markets
+            };
+            
+            if market.liquidity < min_liquidity {
                 continue;
             }
 
-            // Get model prediction
-            let prediction = match model.predict(market).await {
-                Ok(p) => p,
-                Err(e) => {
-                    tracing::debug!("Model failed for {}: {}", market.id, e);
-                    continue;
-                }
+            // Generate signal: use crypto strategy for crypto markets, LLM for others
+            let signal = if is_crypto_market {
+                // Use Binance price momentum for crypto markets
+                crypto_strategy.generate_signal(market, &crypto_tracker)
+            } else {
+                // Use LLM prediction for regular markets
+                let prediction = match model.predict(market).await {
+                    Ok(p) => p,
+                    Err(e) => {
+                        tracing::debug!("Model failed for {}: {}", market.id, e);
+                        continue;
+                    }
+                };
+                signal_gen.generate(market, &prediction)
             };
 
-            // Generate signal
-            if let Some(signal) = signal_gen.generate(market, &prediction) {
+            if let Some(signal) = signal {
                 tracing::info!(
                     "Signal: {} {} | Model: {:.1}% vs Market: {:.1}% | Edge: {:.1}%",
                     match signal.side {

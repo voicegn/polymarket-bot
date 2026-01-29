@@ -7,8 +7,17 @@ use crate::types::{Market, Outcome};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use tracing::debug;
+
+/// Known crypto series IDs
+pub const CRYPTO_SERIES: &[(&str, &str, u64)] = &[
+    ("BTC 15m", "btc-up-or-down-15m", 10192),
+    ("BTC 4H", "bitcoin-up-or-down-4h", 10323),
+    ("ETH 5m", "eth-up-or-down-5m", 10683),
+];
 
 /// Gamma API client for market data
+#[derive(Clone)]
 pub struct GammaClient {
     http: Client,
     base_url: String,
@@ -173,4 +182,89 @@ impl GammaClient {
             closed: gm.closed,
         })
     }
+
+    /// Get active crypto markets (BTC/ETH Up/Down)
+    pub async fn get_crypto_markets(&self) -> Result<Vec<Market>> {
+        let mut markets = Vec::new();
+
+        for (name, _slug, series_id) in CRYPTO_SERIES {
+            debug!("Fetching {} markets from series {}", name, series_id);
+            
+            // Get series with events
+            let url = format!("{}/series/{}", self.base_url, series_id);
+            let resp = self.http.get(&url).send().await?;
+            
+            if !resp.status().is_success() {
+                debug!("Failed to fetch series {}: {}", series_id, resp.status());
+                continue;
+            }
+
+            let series: SeriesResponse = match resp.json().await {
+                Ok(s) => s,
+                Err(e) => {
+                    debug!("Failed to parse series {}: {}", series_id, e);
+                    continue;
+                }
+            };
+
+            // Get active, non-closed events
+            let active_events: Vec<_> = series
+                .events
+                .into_iter()
+                .filter(|e| e.active && !e.closed)
+                .take(5) // Limit to 5 most recent events per series
+                .collect();
+
+            for event in active_events {
+                // Fetch full event data with markets
+                let event_url = format!("{}/events/{}", self.base_url, event.id);
+                let event_resp = match self.http.get(&event_url).send().await {
+                    Ok(r) => r,
+                    Err(_) => continue,
+                };
+
+                let full_event: EventResponse = match event_resp.json().await {
+                    Ok(e) => e,
+                    Err(_) => continue,
+                };
+
+                // Parse markets from event
+                if let Some(event_markets) = full_event.markets {
+                    for em in event_markets {
+                        if let Some(market) = self.parse_market(em) {
+                            markets.push(market);
+                        }
+                    }
+                }
+            }
+        }
+
+        debug!("Found {} crypto markets", markets.len());
+        Ok(markets)
+    }
+}
+
+/// Response structure for series endpoint
+#[derive(Debug, Deserialize)]
+struct SeriesResponse {
+    #[allow(dead_code)]
+    title: String,
+    events: Vec<SeriesEvent>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SeriesEvent {
+    id: String,
+    #[allow(dead_code)]
+    title: String,
+    active: bool,
+    closed: bool,
+}
+
+/// Response structure for event endpoint
+#[derive(Debug, Deserialize)]
+struct EventResponse {
+    #[allow(dead_code)]
+    title: String,
+    markets: Option<Vec<GammaMarket>>,
 }

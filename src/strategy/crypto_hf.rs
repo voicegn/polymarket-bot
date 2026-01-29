@@ -50,7 +50,7 @@ pub struct CryptoHfStrategy {
 impl Default for CryptoHfStrategy {
     fn default() -> Self {
         Self {
-            min_momentum: dec!(0.003),           // 0.3% minimum move
+            min_momentum: dec!(0.001),           // 0.1% minimum move (more aggressive)
             entry_minutes_before_close: 3,       // Enter 3 mins before close
             certainty_threshold: dec!(0.85),     // 85% certainty
             max_position_usd: dec!(20),          // $20 max per trade
@@ -68,6 +68,56 @@ impl CryptoPriceTracker {
             xrp_prices: VecDeque::with_capacity(100),
             max_history: 100,
         }
+    }
+
+    /// Initialize history using Binance klines API
+    pub async fn init_history(&mut self) -> Result<()> {
+        let symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"];
+        
+        for symbol in symbols {
+            // Get 1-minute klines for last 15 minutes
+            let url = format!(
+                "https://api.binance.com/api/v3/klines?symbol={}&interval=1m&limit=15",
+                symbol
+            );
+            
+            let resp: Vec<Vec<serde_json::Value>> = match self.http.get(&url).send().await {
+                Ok(r) => match r.json().await {
+                    Ok(j) => j,
+                    Err(_) => continue,
+                },
+                Err(_) => continue,
+            };
+            
+            let queue = match symbol {
+                "BTCUSDT" => &mut self.btc_prices,
+                "ETHUSDT" => &mut self.eth_prices,
+                "SOLUSDT" => &mut self.sol_prices,
+                "XRPUSDT" => &mut self.xrp_prices,
+                _ => continue,
+            };
+            
+            // Parse klines: [open_time, open, high, low, close, ...]
+            for kline in resp {
+                if kline.len() < 5 {
+                    continue;
+                }
+                let timestamp_ms = kline[0].as_i64().unwrap_or(0);
+                let close_price = kline[4].as_str().unwrap_or("0");
+                
+                if let Ok(price) = close_price.parse::<Decimal>() {
+                    let timestamp = DateTime::from_timestamp_millis(timestamp_ms)
+                        .unwrap_or_else(Utc::now);
+                    queue.push_back(PricePoint { price, timestamp });
+                }
+            }
+        }
+        
+        tracing::info!("Initialized crypto price history: BTC={}, ETH={}, SOL={}, XRP={} points",
+            self.btc_prices.len(), self.eth_prices.len(), 
+            self.sol_prices.len(), self.xrp_prices.len());
+        
+        Ok(())
     }
 
     /// Fetch current prices from Binance
@@ -196,10 +246,20 @@ impl CryptoHfStrategy {
         let info = Self::is_crypto_hf_market(market)?;
         
         // Get current momentum
-        let momentum = tracker.calculate_momentum(&info.asset, 10)?;
+        let momentum = match tracker.calculate_momentum(&info.asset, 10) {
+            Some(m) => m,
+            None => {
+                tracing::debug!("Crypto {}: No momentum data yet (need more price history)", info.asset);
+                return None;
+            }
+        };
+        
+        tracing::info!("Crypto {}: momentum = {:.4}%", info.asset, momentum * dec!(100));
         
         // Check if momentum is strong enough
         if momentum.abs() < self.min_momentum {
+            tracing::debug!("Crypto {}: momentum {:.4}% below threshold {:.4}%", 
+                info.asset, momentum.abs() * dec!(100), self.min_momentum * dec!(100));
             return None;
         }
         
