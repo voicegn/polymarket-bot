@@ -35,7 +35,7 @@
 
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-324%20passing-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1144%20passing-green.svg)]()
 
 A high-performance, institutional-grade automated trading system for [Polymarket](https://polymarket.com) prediction markets. Built in Rust for speed, safety, and reliability.
 
@@ -279,6 +279,32 @@ polymarket-bot trades [--limit <n>]
 # Get help
 polymarket-bot --help
 ```
+
+### 📝 Paper Trading CLI
+
+Simulate trades with real market data without risking funds:
+
+```bash
+# Check paper trading account status
+cargo run --bin paper_cli -- status
+
+# Buy shares (search by keyword)
+cargo run --bin paper_cli -- buy -m "trump" -s yes -a 50
+
+# Buy shares (by market ID)
+cargo run --bin paper_cli -- buy --id -m 517310 -s yes -a 50
+
+# View open positions
+cargo run --bin paper_cli -- positions
+
+# Sell a position
+cargo run --bin paper_cli -- sell -p <position_id>
+
+# View trade history
+cargo run --bin paper_cli -- history --limit 10
+```
+
+State is persisted to `paper_trading_state.json`.
 
 ## 📊 Trading Strategies
 
