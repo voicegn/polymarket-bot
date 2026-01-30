@@ -197,9 +197,9 @@ impl DryRunSimulator {
                 
                 // Simulate exit (random profit/loss based on edge)
                 use rand::Rng;
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 let edge_factor = signal.edge;
-                let random_val: f64 = rng.gen_range(-0.05..0.05);
+                let random_val: f64 = rng.random_range(-0.05..0.05);
                 let random_factor = Decimal::from_f64_retain(random_val).unwrap_or(dec!(0));
                 let exit_prob = signal.market_probability + edge_factor + random_factor;
                 let exit_prob = exit_prob.max(dec!(0.01)).min(dec!(0.99));
@@ -244,8 +244,8 @@ impl DryRunSimulator {
         use rand::Rng;
         let base = market.yes_price().unwrap_or(dec!(0.5));
         // Add variance to simulate model disagreement (±15% range)
-        let mut rng = rand::thread_rng();
-        let random_val: f64 = rng.gen_range(-0.15..0.15);
+        let mut rng = rand::rng();
+        let random_val: f64 = rng.random_range(-0.15..0.15);
         let variance = Decimal::from_f64_retain(random_val).unwrap_or(dec!(0));
         (base + variance).max(dec!(0.05)).min(dec!(0.95))
     }

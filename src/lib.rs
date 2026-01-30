@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Polymarket Probability Trading Bot
 //! 
 //! A Rust-based automated trading system for Polymarket prediction markets.

@@ -14,8 +14,6 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 /// A negative risk arbitrage opportunity

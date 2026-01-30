@@ -17,9 +17,9 @@ use rust_decimal::Decimal;
 use rust_decimal::prelude::*;
 use rust_decimal_macros::dec;
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
-use super::features::{FeatureExtractor, MarketFeatures, FeatureConfig};
+use super::features::{FeatureExtractor, FeatureConfig};
 use super::calibration::{ProbabilityCalibrator, CalibrationMethod};
 use super::ensemble::{EnsemblePredictor, ModelPrediction, EnsembleConfig, EnsembleMethod};
 use super::factors::{MultiFactorFusion, Factor, FactorCategory, FusionConfig};

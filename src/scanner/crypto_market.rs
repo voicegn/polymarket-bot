@@ -10,7 +10,7 @@
 //! - `{symbol}-updown-30m-{unix_timestamp}` for 30-min markets
 //! - `{symbol}-updown-hourly-{unix_timestamp}` for hourly markets
 
-use crate::error::{BotError, Result};
+use crate::error::Result;
 use chrono::{DateTime, Duration, Utc};
 use reqwest::Client;
 use rust_decimal::Decimal;

@@ -263,7 +263,7 @@ impl TrailingStopManager {
 
         let (stop_price, is_long, breakeven_active, mode, opened_at, is_stopped,
              entry_price, high_water_mark, low_water_mark, max_profit_pct,
-             current_profit, entry_atr, step_count) = state_info;
+             current_profit, entry_atr, _step_count) = state_info;
 
         // Check for max age
         if let Some(max_hours) = self.config.max_position_age_hours {

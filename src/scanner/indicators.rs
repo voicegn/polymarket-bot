@@ -389,7 +389,7 @@ impl SpikeDetector {
 
         // Check for recovery (price moved away from extreme)
         let current = *self.prices.back().unwrap();
-        let mid = (max_price + min_price) / 2.0;
+        let _mid = (max_price + min_price) / 2.0;
         let recovery = (current - min_price) / (max_price - min_price);
 
         // Determine spike type

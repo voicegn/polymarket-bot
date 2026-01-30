@@ -28,8 +28,6 @@ pub use indicators::{
 pub use negative_risk::NegativeRiskScanner;
 pub use realtime::RealtimeArbitrageScanner;
 
-use crate::error::Result;
-use crate::types::Market;
 use rust_decimal::Decimal;
 use std::time::Duration;
 use tokio::sync::mpsc;

@@ -17,6 +17,7 @@
 //! ```
 
 use rust_decimal::Decimal;
+#[allow(unused_imports)]
 use rust_decimal::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
