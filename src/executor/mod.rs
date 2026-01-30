@@ -1,5 +1,6 @@
 //! Trade execution and risk management
 
+pub mod arbitrage_executor;
 pub mod smart_executor;
 pub mod gradual_exit;
 pub mod slippage_predictor;
@@ -7,6 +8,7 @@ pub mod price_optimizer;
 pub mod twap_vwap;
 pub mod latency_optimizer;
 
+pub use arbitrage_executor::{ArbitrageExecutor, ArbitrageExecutorConfig, ArbitrageResult, ArbitrageMetrics};
 pub use slippage_predictor::{SlippagePredictor, SlippageConfig, SlippagePrediction, OrderBook, OrderSide};
 pub use price_optimizer::{PriceOptimizer, PriceOptimizerConfig, PriceRecommendation, ExecutionUrgency, RecommendedOrderType};
 pub use twap_vwap::{ExecutionEngine, ExecutionConfig, ExecutionAlgorithm, ExecutionSummary, default_crypto_volume_profile};
