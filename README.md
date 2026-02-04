@@ -1,5 +1,25 @@
 # 🎲 Polymarket Trading Bot
 
+> ## 🚨 PROJECT STATUS / 项目状态 🚨
+>
+> 🇺🇸 **This repository is no longer actively maintained.** Due to limited time and resources, no further updates or support will be provided. If you're interested, please use AI tools (ChatGPT, Claude, etc.) to study and modify the code yourself.
+>
+> 🇨🇳 **本仓库已停止迭代优化与维护。** 由于精力有限，不再提供更新或支持。如有需要，请借助 AI 工具（ChatGPT、Claude 等）自行研究和修改代码。
+>
+> 🇯🇵 **このリポジトリはメンテナンスを終了しました。** 今後の更新やサポートはありません。必要な方は AI ツールを使って自己研究してください。
+>
+> 🇰🇷 **이 저장소는 더 이상 유지보수되지 않습니다.** AI 도구를 사용하여 직접 연구하세요.
+>
+> 🇪🇸 **Este repositorio ya no se mantiene.** Use herramientas de IA para investigar por su cuenta.
+>
+> 🇫🇷 **Ce dépôt n'est plus maintenu.** Utilisez des outils IA pour vos recherches.
+>
+> 🇩🇪 **Dieses Repository wird nicht mehr gepflegt.** Nutzen Sie KI-Tools für eigene Recherchen.
+>
+> 🇷🇺 **Этот репозиторий больше не поддерживается.** Используйте ИИ для самостоятельного изучения.
+
+---
+
 > ## ⚠️ CRITICAL DISCLAIMER / 重要免责声明 ⚠️
 >
 > ### 🚫 DO NOT USE FOR REAL TRADING / 禁止用于真实交易 🚫
