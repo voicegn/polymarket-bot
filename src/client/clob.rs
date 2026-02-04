@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{Engine as _, engine::general_purpose::{STANDARD as BASE64, URL_SAFE_NO_PAD as BASE64_URL_SAFE}};
 
 /// Build HMAC signature for Level 2 authentication
 fn build_hmac_signature(
@@ -23,8 +23,9 @@ fn build_hmac_signature(
     path: &str,
     body: Option<&str>,
 ) -> Result<String> {
-    // Decode the base64 secret
-    let secret_bytes = BASE64.decode(secret)
+    // Decode the base64 secret (try URL-safe first, then standard)
+    let secret_bytes = BASE64_URL_SAFE.decode(secret)
+        .or_else(|_| BASE64.decode(secret))
         .map_err(|e| BotError::Auth(format!("Invalid API secret: {}", e)))?;
     
     // Build the message: timestamp + method + path + body
