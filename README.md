@@ -20,9 +20,9 @@
 >
 > ---
 >
-> ### 💬 Research Community / 研究者交流群
+> ### 💬 Research Community / 研究者交流群 （里面有彩蛋图资料）
 >
-> [![Discord](https://img.shields.io/badge/Discord-Research%20Only-5865F2?logo=discord&logoColor=white)](https://discord.gg/ZT7wsEHG)
+> [![Discord](https://img.shields.io/badge/Discord-Research%20Only-5865F2?logo=discord&logoColor=white)](https://discord.gg/xvmxcgfSVP)
 >
 > 🇺🇸 **For researchers only.** Join to discuss prediction market mechanics, API research, and algorithmic concepts. **Non-research purposes strictly prohibited.** Members joining for trading signals, financial advice, or commercial purposes will be removed.
 >
