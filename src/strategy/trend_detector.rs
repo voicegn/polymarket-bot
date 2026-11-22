@@ -2,6 +2,8 @@
 //!
 //! 多指标融合判断短期趋势，只在高置信度时触发交易信号
 
+use fin_primitives::signals::indicators::{Macd, Rsi};
+use fin_primitives::signals::{BarInput, Signal};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
@@ -203,33 +205,12 @@ impl TrendDetector {
     
     /// 计算 RSI
     fn calculate_rsi(&self, closes: &[Decimal]) -> Option<Decimal> {
-        if closes.len() < self.rsi_period + 1 {
-            return None;
+        let mut rsi = Rsi::new("rsi", self.rsi_period).ok()?;
+        let mut value = None;
+        for close in closes {
+            value = rsi.update(&BarInput::from_close(*close)).ok()?.as_decimal();
         }
-        
-        let mut gains = dec!(0);
-        let mut losses = dec!(0);
-        
-        for i in (closes.len() - self.rsi_period)..closes.len() {
-            let change = closes[i] - closes[i - 1];
-            if change > dec!(0) {
-                gains += change;
-            } else {
-                losses += change.abs();
-            }
-        }
-        
-        let avg_gain = gains / Decimal::from(self.rsi_period);
-        let avg_loss = losses / Decimal::from(self.rsi_period);
-        
-        if avg_loss == dec!(0) {
-            return Some(dec!(100));
-        }
-        
-        let rs = avg_gain / avg_loss;
-        let rsi = dec!(100) - (dec!(100) / (dec!(1) + rs));
-        
-        Some(rsi)
+        value
     }
     
     /// 计算 MACD
@@ -243,10 +224,17 @@ impl TrendDetector {
         
         let macd_line = ema_fast - ema_slow;
         
-        // 简化: 用最近的 macd 值近似信号线
-        // 实际应该计算 macd 历史的 EMA
-        let signal_line = macd_line * dec!(0.9); // 简化处理
-        let histogram = macd_line - signal_line;
+        // 信号线 = MACD 历史的 EMA (fin-primitives Macd 返回柱状图)
+        let mut macd = Macd::new("macd", self.macd_fast, self.macd_slow, self.macd_signal).ok()?;
+        let mut histogram = None;
+        for close in closes {
+            histogram = macd
+                .update(&BarInput::from_close(*close))
+                .ok()?
+                .as_decimal();
+        }
+        let histogram = histogram?;
+        let signal_line = macd_line - histogram;
         
         Some((macd_line, signal_line, histogram))
     }
@@ -419,5 +407,30 @@ mod tests {
         let signal = detector.analyze(&bars);
         
         assert!(signal.is_none());
+    }
+    
+    #[test]
+    fn test_rsi_uses_wilder_smoothing() {
+        let detector = TrendDetector {
+            rsi_period: 2,
+            ..TrendDetector::default()
+        };
+        let closes = [dec!(10), dec!(11), dec!(12), dec!(11), dec!(12)];
+        // Wilder: 75. The old plain average of the last 2 changes gave 50.
+        assert_eq!(detector.calculate_rsi(&closes), Some(dec!(75)));
+    }
+    
+    #[test]
+    fn test_macd_signal_line_catches_pullback() {
+        // 40 bars up, then 8 bars down: MACD line still positive but falling below its signal EMA
+        let closes: Vec<Decimal> = (0..40)
+            .map(|i| Decimal::from(100 + i))
+            .chain((1..=8).map(|i| Decimal::from(139 - i)))
+            .collect();
+        let detector = TrendDetector::new();
+        let (macd, signal, histogram) = detector.calculate_macd(&closes).unwrap();
+        assert!(macd > dec!(0));
+        assert!(signal > macd);
+        assert!(histogram < dec!(0));
     }
 }

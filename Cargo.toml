@@ -56,6 +56,7 @@ clap = { version = "4.5", features = ["derive"] }
 # Utilities
 rust_decimal = { version = "1.37", features = ["serde", "maths"] }
 rust_decimal_macros = "1.37"
+fin-primitives = { version = "4.0.1", default-features = false, features = ["indicators"] }
 async-trait = "0.1"
 shellexpand = "3.1"
 uuid = { version = "1.11", features = ["v4", "serde"] }
